@@ -57,7 +57,7 @@ $ cd tubakareklaamid‑1920‑40
 
 ## 4. Andmeallikad ja litsentsid
 
--   **DIGARi ajalehe‑korpus** (Eesti Rahvusraamatukogu). Kasutustingimused võimaldavad teadus‑ ja õppetööd; kaubanduslik kasutus vajab eraldi luba.
+-   **DEA DIGARi ajalehe‑korpus** (Eesti Rahvusraamatukogu digilabor). https://digilab.rara.ee/tooriistad/ligipaas-dea-tekstidele/ Kasutustingimused võimaldavad teadus‑ ja õppetööd; kaubanduslik kasutus vajab eraldi luba.
 -   Kood on litsentseeritud ?????????
 
 ------------------------------------------------------------------------

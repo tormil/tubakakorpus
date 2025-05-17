@@ -47,30 +47,28 @@ $ cd tubakareklaamid‑1920‑40
 
 ```         
 /
-├── data/            # 🔒 ei ole Git‑is; toore CSV + JSON failid (alla laadida eraldi)
-├── figs/            # kõik automaatselt salvestatavad pildid & graafikud
-├── R/               # abifunktsioonid (.R) jagamiseks mitme skripti vahel
-└── analysis/        # ülal loetletud *.Rmd ja *.ipynb failid
+├── andmestik/            # 🔒 ei ole Git‑is; toored CSV tabelid
+├── kood/            # ülal loetletud *.Rmd ja *.ipynb failid
+├── logid vms/               # idk
+└── plottide pngd/        # kõik automaatselt salvestatavad pildid & graafikud
 ```
-
-> *Märkus*: Hetkel on failid repoes juurkaustas. Kui teed `renv::init()` või `conda` keskkonna, soovitan need paigutada nagu ülal, et töövoog selgem oleks.
 
 ------------------------------------------------------------------------
 
 ## 4. Andmeallikad ja litsentsid
 
 -   **DIGARi ajalehe‑korpus** (Eesti Rahvusraamatukogu). Kasutustingimused võimaldavad teadus‑ ja õppetööd; kaubanduslik kasutus vajab eraldi luba.
--   Kood on litsentseeritud MIT järgi, v.a. kui failis on teisiti märgitud.
+-   Kood on litsentseeritud ?????????
 
 ------------------------------------------------------------------------
 
 ## 5. Analüüsi kordus ("reproducibility")
 
-1.  **Laadi andmed** kausta `data/` (vt. `tubakakorpus.Rmd`, kus on allalaadimis‑URL‑id).
+1.  **Laadi andmed** kausta `kood/` (vt. `tubakakorpus.Rmd`, kus on allalaadimis‑URL‑id).
 2.  **Käivita** `renv::restore()` või `conda env create -f environment.yml` vastavalt oma eelistusele.
-3.  Ava kas:
-    -   **`Tubakaandmestik_loputoo.ipynb`** – kui eelistad Jupyterit;
-    -   **`branch_bakat66top2vecrtest+stopptykid.Rmd`** – kui tahad otse teemamodelleerimist R‑is.
+3.  Ava:
+    -   **`Tubakaandmestik_loputoo.ipynb`**
+    -   **`tubakakorpus.Rmd`**
 4.  Pane tähele seadeid `params`‑plokis; mõned failid eeldavad tee‑muutuja (`data_dir`) määramist.
 
 ------------------------------------------------------------------------

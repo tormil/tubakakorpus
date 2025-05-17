@@ -1,0 +1,278 @@
+---
+title: "sissejuhatusRl6put66"
+author: "Tormi Lust"
+date: "2024-11-23"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Eesti tubakareklaamid aastatel 1920-1940
+
+## SEE FAIL ON KONKORDANTSIDE KASUTAMISE PÕHJENDUS, ÜKS BRANCH/ITERATSIOON LÕPUTÖÖLE
+
+Jupyteri Notebookis kirjutatud kood on eeskuju saanud Digilabi juhendist siit: https://digilab.rara.ee/tooriistad/ligipaas-dea-tekstidele/ 
+
+Töö eesmärk on näidata enda tööprotsessi, kuidas olen töödelnud ja kontrollinud enda andmestikku.
+Toon välja kõik erinevad uuritud harud, mille käigus üritasin luua puhta andmestiku.
+
+## Andmestik
+
+Andmestik pärineb DIGARist ning koosneb digiteeritud Eesti ajalehtedest perioodil 1920-1940.
+Andmestiku võtsin välja JupyterHub pilvekeskkonna kaudu, kus sain ligipääsu täistekstidele ja metaandmetele ning tõstsin RStudiosse edasi töötlemiseks. Jupyter'is loodud Notebook on samuti materjalides olemas. Regulaaravaldisteks oli "tubak", "pabeross", "sigar" ning "suits". 
+Jupyter'iga saadud andmed panin .csv formaati. Regulaaravaldistega tegin .csv andmestiku. Andmestik on ka juba lemmatiseeritud. 
+
+Kuna ajalehekuulutused on veergudeks jaotatud, kus võib ühes veerus olla mitu reklaami, ning nende vahel puudub paragraafimärk (mis on lemmatiseerimata andmestikus olemas, kuid siiski ei eralda mitu reklaami üksteise küljest), pean täpsema tulemuse jaoks kasutama konkordantse oma regulaaravaldiste ligidal.
+
+
+```{r library, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(data.table)
+library(lmtest)
+
+#setwd("C:/Users/Tormi/Desktop/Rkeel/")
+```
+
+```{r andmestik}
+tekstid_metaga <- read.csv("C:/Users/Tormi/Desktop/Rkeel/Lust_sissejuhRloputoo/tekstid_metaga.csv")
+#knittimine viskas errorisse kui panin read.csv alates viimasest folderist
+```
+
+"Tekstid_metaga" on andmestik, kus on tehtud Digilab juhendi järgi märksõnade/regulaaravaldiste otsing sõnadega "tubak|suits|sigar|pabeross", lemmatiseeritud ning filtreeritud, et näitaks vaid ajalehti aastavahemikus 1920-1939.
+
+Digilab tööriistadest on leitud ka võimalus lehekülgede kaupa allikate leidmise jaoks ehk segmenteerimata artiklid ja reklaamid, kuid see viis mind tupikusse, kuna artiklid ja reklaamid on seal ühes pajas ja nende eraldamine nt visuaalse tuvastamisega on mulle tundmatu.
+Samuti on võimalik lemmatiseerimata andmeid saada, kuid sõnasageduse jms analüüsi tarbeks on kasulikum kasutada puhast lemmatiseeritud andmestikku ning ülaltoodud "tekstid_metaga" on lemmatiseeritud.
+
+
+## Andmestiku ülevaade
+
+### Vaatame esialgu, mis sorti andmed me digiarhiivist saime?
+
+```{r ylevaade, echo=F}
+tekstid_metaga %>% 
+  group_by(year, LogicalSectionType) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = year, y = count, fill = LogicalSectionType)) +  
+  geom_col() +  
+  labs(title = "Märksõnadega tubak|pabeross|sigar|suits reklaamide ja artiklite koguhulk 1920-1939 aastatel", 
+       x = "Aasta", 
+       y = "Hulk") 
+
+tekstid_metaga %>%
+  filter(LogicalSectionType == "ADVERTISEMENT") %>%  
+  group_by(year) %>%  
+  summarise(count = n()) %>%  
+  ggplot(aes(x = year, y = count)) +  
+  geom_col(fill = "blue") +  
+  labs(title = "Tubakareklaamide koguhulk 1920-1939", 
+       x = "Aasta", 
+       y = "Hulk") 
+```
+
+Ma ei tea, miks on 1924. aastal tubakareklaamide koguhulgas selline hüpe.
+
+Kuna töös otsin tubakareklaame, siis alustan alguses reklaamide filtreerimisega ning siis märksõnaotsinguga 
+
+Segmenteerin, et artiklite asemel esineks ainult segmenteeritud reklaamid/kuulutused.
+```{r tubakareklaamid, include=F}
+reklaamid <- tekstid_metaga %>%
+  filter(LogicalSectionType == "ADVERTISEMENT")
+
+dim(reklaamid)
+
+paevalehe_reklaamid <- reklaamid %>%
+  filter(str_detect(docid, "postimees|sakala|kaja|paevaleht"))
+
+dim(paevalehe_reklaamid)
+```
+
+### Vaatame, milline näeb välja 5 päevalehe tubakareklaamide sõnasagedused. 
+
+Sõnad on lemmatiseeritud, stoppsõnad on sagedusest ära võetud ning tabelit on piiratud alates 3-tähelistest sõnadest.
+
+Valitud on päevalehtedeks Postimees, Sakala, Päevaleht ja Kaja, eesmärgiks saada võimalikult ühtlustatud valimi reklaamidest.
+```{r tubakareklaamide sonasagedus, echo=F}
+library(tidytext)
+stoppsonad <- readLines("http://kodu.ut.ee/~soras/tekstikorpused/stoppsonad_rk.txt")
+
+sonasagedus2 <- paevalehe_reklaamid %>%
+  filter(LogicalSectionType == "ADVERTISEMENT") %>% 
+  unnest_tokens(word, txt) %>% 
+  mutate(word = str_remove_all(word, "[0-9]")) %>% 
+  filter(nchar(word) > 3) %>% 
+  anti_join(data.frame(word = stoppsonad), by = "word") %>% 
+  count(word, sort = TRUE) %>% 
+  filter(n > 3)
+
+ggplot(sonasagedus2[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "Sõnasagedus reklaamides")
+```
+
+See on nii-öelda hea piltlik ülevaade andmete puhtusest/mustusest.
+
+### Millegipärast on sõnasageduses populaarseteks sõnadeks "tuba", "korter", "köök", "laps" jne. Miks?
+
+Kui vaadata pisteliselt reklaame, siis sinna hulka kuuluvad ka töökuulutused ning mitu reklaami on kategoriseeritud ühe reklaami alla, seega peame mõtlema muule lahendusele.
+
+### Toon näitlikustamiseks kaks reklaamteksti.
+
+```{r korter}
+korter_tekstid <- paevalehe_reklaamid %>%
+  filter(str_detect(txt, "korter"))
+
+korter_tekstid$txt[korter_tekstid$id == "kaja19200527-1.2.83.3"]
+korter_tekstid$txt[korter_tekstid$id == "kaja19230922-1.2.34.1"]
+```
+
+Visuaalseks näitlikustamiseks on ka pisteliste artiklite lingid:
+https://dea.digar.ee/article/kaja/1920/05/27/1/83.3
+https://dea.digar.ee/article/kaja/1923/09/22/1/34.1 
+
+
+Kõige parem viis edasi oleks piirata andmestiku konkordantsidega ning Jupyter'is on ka konkordantskäsk juhendis välja toodud, millega tõin konkordantside andmestiku siia üle.
+
+Aga kohe tekkis küsimus, et kui suure vahega piirata konkordantse, kas 30, 50, 100 või rohkema tähemärgiga?
+
+### Vaatame lähemalt andmestikku ja reklaamide tekstipikkust,
+
+```{r konkordantsid, echo=F}
+teksti_pikkus <- nchar(reklaamid$txt)
+
+#Tabel mis näitab tekstipikkust
+hist(teksti_pikkus[teksti_pikkus <= 5000], 
+     breaks = seq(0, 5000, by = 100),
+     main = "Teksti pikkuste jaotus kuni 5000 tähemärki", 
+     xlab = "Pikkus (tähemärgid)", 
+     ylab = "Kirjete arv", 
+     col = "blue", 
+     border = "black")
+
+#Vaatame, kui suur osa on üle 1000 stringi?
+yle_1000 <- sum(nchar(reklaamid$txt) > 1000)
+alla_1000 <- sum(nchar(reklaamid$txt) <= 1000)
+
+cat("Reklaamide arv üle 1000 tähemärgi:", yle_1000, "\n")
+cat("Reklaamide arv alla või võrdne 1000 tähemärgiga:", alla_1000, "\n")
+
+#TEE SIIA TEKSTI PIKKUSTE JAOTUS AASTAPEALE
+
+```
+
+Mõned reklaamid on kategoriseeritud õigesti, kuid päris suur hulk reklaamidest ületab 1000 tähemärgi pikkuse, seega on vaja kasutada konkordantsidega andmestikku ning ma piirdusin 100 tähemärgiga märksõnadest vasakule ja paremale, mis on umbes 10-15 sõna.
+
+```{r konkordantsid 2, include=F}
+#Loeme andmestiku sisse
+concs100 <- read.csv("C:/Users/Tormi/Desktop/Rkeel/Lust_sissejuhRloputoo/concs100b.csv")
+
+#Filtreerime andmestiku samamoodi, et sisaldaks vaid 5 päevalehte.
+reklaamid_concs <- concs100 %>%
+  filter(LogicalSectionType == "ADVERTISEMENT")
+
+dim(reklaamid_concs)
+
+paevalehe_reklaamid_concs <- reklaamid_concs %>%
+  filter(str_detect(docid, "postimees|sakala|kaja|paevaleht"))
+
+dim(paevalehe_reklaamid_concs)
+```
+
+Konkordantsidega andmed sisse loetud ning vaatame neid kahte varem väljatoodud reklaamteksti
+```{r korter2}
+reklaamid_concs$context[reklaamid_concs$id == "kaja19200527-1.2.83.3"]
+reklaamid_concs$context[reklaamid_concs$id == "kaja19230922-1.2.34.1"]
+```
+On näha, et viimane tulemus on piisavalt kitsenenud, et sisaldab peaaegu ainult tubakareklaame, veidi on ka kattuvat reklaami Põllumeeste koolist. Konkordantse on kokku kuus, kuid erinevaid tubakareklaame oli kokku 4.
+
+Vaatame nüüd, kuidas näeb välja sõnasagedus ilma konkordantsideta ja koos konkordantsidega.
+
+```{r konkordantsid 3, echo=F}
+#Sõnasagedus concs100 andmestikuga
+sonasagedus <- concs100 %>%
+  filter(LogicalSectionType == "ADVERTISEMENT") %>% 
+  unnest_tokens(word, context) %>% 
+  mutate(word = str_remove_all(word, "[0-9]")) %>% 
+  filter(nchar(word) > 3) %>% 
+  anti_join(data.frame(word = stoppsonad), by = "word") %>% 
+  count(word, sort = TRUE) %>% 
+  filter(n > 3)
+#ilma konkordantsiga sõnasagedus
+ggplot(sonasagedus2[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "Sõnasagedus reklaamides")
+#concs100 sõnasagedus
+ggplot(sonasagedus[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "Sõnasagedus reklaamides konkordantsidega")
+```
+
+Juba on näha, et on palju puhtam tulemus, kus esineb päriselt tubakareklaamidega seonduvaid sõnu kõige rohkem, nagu peamised 4 märksõna ning nendega seonduvad sõnad, nagu "headus", "aroom", "maitse", "karp" ning ka ettevõtte "Astoria" nimi.
+
+Pisteliselt kontrollides olen ka leidnud, et võiks proovida regulaaravaldise "suits" asemel kasutada "suitsetaja", kuna "suits" annab ka suitsutatud söögitoodete reklaame.
+
+Proovime vaadata, mida näitab sõnasagedustabel, kui otsin ainult sõnu, mis algavad "suits"uga.
+Edasi jätkan ka konkordantside andmestikuga.
+
+```{r suits, echo=F}
+suitsusagedus <- paevalehe_reklaamid_concs %>%
+  filter(str_detect(context, "suits")) %>%
+  unnest_tokens(word, context) %>% 
+  filter(str_starts(word, "suits")) %>% 
+  count(word, sort = TRUE) 
+
+ggplot(suitsusagedus[1:15, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "Sõna suits sagedus")
+```
+
+Teeme sama ka teiste kasutatud regulaaravaldistega
+```{r regexid, echo=F}
+tubakasagedus <- paevalehe_reklaamid_concs %>%
+  filter(str_detect(context, "tubak")) %>%
+  unnest_tokens(word, context) %>% 
+  filter(str_starts(word, "tubak")) %>% 
+  count(word, sort = TRUE) 
+
+ggplot(tubakasagedus[1:15, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "Sõna tubak sagedus")
+
+paberossisagedus <- paevalehe_reklaamid_concs %>%
+  filter(str_detect(context, "pabeross")) %>%
+  unnest_tokens(word, context) %>% 
+  filter(str_starts(word, "pabeross")) %>% 
+  count(word, sort = TRUE) 
+
+ggplot(paberossisagedus[1:15, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "Sõna pabeross sagedus")
+
+sigarisagedus <- paevalehe_reklaamid_concs %>%
+  filter(str_detect(context, "sigar")) %>%
+  unnest_tokens(word, context) %>% 
+  filter(str_starts(word, "sigar")) %>% 
+  count(word, sort = TRUE) 
+
+ggplot(sigarisagedus[1:15, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "Sõna sigar sagedus")
+```
+
+Kokkuvõtteks olen töö käigus üles leidnud DIGARi andmestiku kasutamise plussid ja miinused ning töö käigus endale mõtestanud ühe võimaluse veel tubakareklaamide täpse andmestiku saamiseks.
+Regulaaravaldisteks kasutada kõiki tubakaettevõtete nimesid, kuna reklaami all oli alati vabrik/ettevõte välja toodud. Samas juba varasem uurimine on näidanud, et raske on kasutada näiteks "H. Anton" ettevõtte nime regulaaravaldisena, kuna nimi on populaarne ja "H." on OCRiga päris tihti kaotsi läinud.
+
+Eesti artiklite digiarhiiv annab võimalust kasutada OCRitud ajalehti, millest umbes pooled koguhulgas on ka segmenteeritud, kuid see segmenteerimine on toonud vähemalt reklaamide/kuulutuste osas omasid miinuseid, lükates mitu reklaami üheks segmentiks, kuigi artiklitega minu teada nii segmenteeritud ei ole. Segmenteeritud ajalehtedel on ka küljes väärtuslik metainfo, mida saab uurimusteks ära kasutada ning arhiiv on andnud meile juba võimaluse seda ka lemmatiseerituna kasutada, tehes suure töö tulevastele uurijatele ette ära.
+
+Töö käigus oli tekkinud ka mitu muret andmete erineva suurusega, kui seda poleks pidanud olema. Näiteks päevalehtede andmestiku hulk ei läinud dea.digar.ee identse märksõnaotsinguga kokku, konkordantside andmestiku hulk suurenes, kuna ühes reklaamis võib märksõnu esineda mitu korda, nagu nt "tubakavabrikus tehakse paberosse". 
+
+Arvasin ka, et konkordantsidega saan töö- ja korterikuulutustest lahti, kuid see aitab mul vaid reklaame paremini segmenteerituna hoida.

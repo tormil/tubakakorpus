@@ -1,0 +1,748 @@
+---
+title: "Tubakareklaamid Eesti ajalehtedes 1920-1940"
+author: "Tormi Lust"
+output:
+  html_document: default
+  pdf_document: default
+date: "2024-10-18"
+---
+```{r puhastus}
+#eemalda kõik environmentist, ainult jooksutada enda soovil
+#rm(list = ls())
+```
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(data.table)
+library(tidytext)
+library(lmtest)
+
+```
+
+### Andmestiku sisselugemine RStudiosse.
+
+"Tekstid_metaga" on andmestik, kus on tehtud Digilab juhendi järgi märksõnade/regulaaravaldiste otsing sõnadega "tubak, suits, sigar, pabeross", mis on lemmatiseeritud ning filtreeritud, et näitaks vaid ajalehti aastavahemikus 1920-1939.
+
+Digilab tööriistadest on leitud ka võimalus lehekülgede kaupa allikate leidmise jaoks ehk segmenteerimata artiklid ja reklaamid, kuid see viis mind tupikusse, kuna artiklid ja reklaamid on seal ühes pajas ja nende eraldamine nt visuaalse tuvastamisega on uus väljakutse praeguse DIGARi kasutatud OCRi parandamise nimel, mille kvaliteet jääb lehekülgedel umbes 65%-85% vahele.
+
+Samuti on võimalik lemmatiseerimata andmeid saada, kuid sõnasageduse jms analüüsi tarbeks on kasulikum kasutada puhast lemmatiseeritud andmestikku ning ülaltoodud "tekstid_metaga" on lemmatiseeritud.
+
+```{r andmestik}
+tekstid_metaga <- read.csv("C:/Users/Tormi/Desktop/BAKAT66/andmestik/toores/tekstid_metaga.csv")
+```
+
+### "Tekstid_metaga" andmestiku aastakaupa ülevaade.
+
+```{r esmane ylevaade, echo=F}
+tekstid_metaga %>% 
+  filter(LogicalSectionType %in% c("ADVERTISEMENT", "ARTICLE", "ARTICLE+ILLUSTRATION")) %>%
+  group_by(year, LogicalSectionType) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = year, y = count, fill = LogicalSectionType)) +  
+  geom_col() +  
+  scale_fill_grey(start = 0.8, end = 0.2) +
+  labs(title = "Segmenteeritud ajaleheandmestik märksõnadega 'tubak', 'pabeross', 'sigar, 'suits*'",
+       x = "Aasta", 
+       y = "Hulk") 
+```
+
+```{r esmane ylevaade2, eval=F}
+tekstid_metaga %>%
+  filter(LogicalSectionType == "ADVERTISEMENT") %>%  
+  group_by(year) %>%  
+  summarise(count = n_distinct(id)) %>%  
+  ggplot(aes(x = year, y = count)) +  
+  geom_col(fill = "black") +  
+  geom_smooth(col = "red", se = FALSE, span = 0.75) + 
+  labs(title = "Märksõnadega 'tubak', 'pabeross', 'sigar, 'suits*' reklaamide ja kuulutuste koguhulk 1920-1939 aastatel", 
+       x = "Aasta", 
+       y = "Hulk") 
+```
+
+### Alaandmestiku ehk tubakakorpuse sisse laadimine.
+
+Piiritleme andmestikku, et sisaldaks vaid 5 päevalehte ning ainult kuulutusi, samuti piiritlen ühe reklaami tekstihulga vaid 100 tähemärgiga vasakult ja paremalt. Päris suur hulk reklaamidest ületab 1000 tähemärgi pikkuse, seega on vaja kasutada konkordantsidega andmestikku ning ma piirdusin 100 tähemärgiga märksõnadest vasakule ja paremale, mis on umbes 10-15 sõna.
+
+```{r tubakareklaamid, echo=F}
+#Näeb välja JupyterLab'is selline:
+#paevalehe_reklaamid <- tekstid_metaga %>%
+#  filter(LogicalSectionType == "ADVERTISEMENT",
+#         str_detect(docid, "postimees|sakala|kaja|paevaleht|uuseesti"))
+
+paevalehe_reklaamid <- read.csv("C:/Users/Tormi/Desktop/BAKAT66/andmestik/t66deldud/paevalehe_reklaamid_concs.csv")
+
+colnames(paevalehe_reklaamid)
+```
+
+"Paevalehe_reklaamid" korpuses on nii "txt" veerg kui ka esimese leitud konkordantsi "context" veerg, kasulik on igaksjuhuks mõlemad veerud alles jätta, kuid põhifookus jääb "context" veeru kasutamisele, kuna "txt" veerus tuleb ebavajalik info juurde.
+
+```{r proovin valja visata asju}
+stop_tykid  <- c("konfisk", "sprott", "korter", "tuba", "köök", "üür", "tööd", "laps", "abielupaar", "kilu", "noormees", "teenistus")
+stopp_regex <- paste(stop_tykid, collapse = "|")   # ei ole ^$, sest otsid fraasi teksti seest
+
+paevalehe_reklaamid <- paevalehe_reklaamid %>% 
+  filter(!str_detect(context, regex(stopp_regex, ignore_case = TRUE)))
+#kell vb mitte
+```
+
+### Päevalehtede korpuse hulga ülevaade.
+
+Valitud on päevalehtedeks Postimees, Sakala, Päevaleht ja Kaja (ja Kaja järglane Uus Eesti), eesmärgiks saada võimalikult ühtlustatud valimi reklaamidest.
+
+```{r paevalehe andmestik} 
+paevalehe_reklaamid %>%
+  filter(LogicalSectionType == "ADVERTISEMENT") %>%
+  group_by(year) %>%
+  summarise(count = n_distinct(id)) %>%
+  ggplot(aes(x = year, y = count)) +  
+  geom_col(fill = "black") +  
+  geom_smooth(col = "red", se = FALSE, span = 0.75) + 
+  labs(title = "Reklaamide/kuulutuste hulk aastakaupa 5 päevalehes", 
+       x = "Aasta", 
+       y = "Hulk") 
+
+#Loess'iga ja usalduspiiriga geom_smooth(col = "red", se = TRUE, span = 0.75) + 
+#Linear on (method = "lm", col = "red", se = FALSE)
+```
+
+Loome sõnasagedusefunktsiooni, kuna kasutame korduvalt seda erinevate sektorite analüüsil. Esmalt laeme sisse stoppsõnad, siis teeme sõnasageduse, kus on vaid sõnad, mis algavad alates 3'st tähest ning "w" täht on asendatud "v" tähega. Numbrid samuti eemaldatud.
+
+```{r sageduss, echo=F}
+stoppsonad <- readLines("https://datadoi.ee/bitstream/handle/33/78/estonian-stopwords-lemmas.txt?sequence=1&isAllowed=y")
+
+#See funktsioon loob sõnasageduse minu andmestiku konteksti tingimustes, vahetades w tähe välja v'ga, võttes ära kõik kuni 3-tähelised sõnad ning kõik numbrid.
+sonasagedusefunktsioon <- function(df) {
+  df %>%
+    filter(LogicalSectionType == "ADVERTISEMENT") %>%
+    unnest_tokens(word, context) %>%
+    mutate(word = str_remove_all(word, "[0-9]")) %>%
+    filter(nchar(word) > 3) %>%
+    mutate(word = str_replace_all(word, "w", "v")) %>%
+    anti_join(data.frame(word = stoppsonad), by = "word") %>%
+    count(word, sort = TRUE) %>%
+    filter(n > 3)
+}
+
+paevalehe_sonasagedus <- sonasagedusefunktsioon(paevalehe_reklaamid)
+
+#20ndateks oldi küll liigutud peamiselt V peale, kuid kohanimed jms on märgatavalt ikka W tähega: mutate(word=str_replace_all(word,"w","v"))
+#vanad stoppsõnad: http://kodu.ut.ee/~soras/tekstikorpused/stoppsonad_rk.txt
+#uued, kus nt pole "olema" ja "tulema": https://datadoi.ee/bitstream/handle/33/78/estonian-stopwords.txt?sequence=1&isAllowed=y
+
+#"korter|tuba|köök|üür|tööd|laps|abielupaar|müüa|müüg|müük" sõnasageduses mõttetu lisand? Kas on vajalik eemaldada?
+```
+
+### Vaatame, milline näeb välja 5 päevalehe tubakareklaamide sõnasagedused 1920-1940 aastate vältel.
+
+Visualiseerime sõnasageduse. Sõnad on lemmatiseeritud, stoppsõnad on sagedusest ära võetud ning tabelit on piiratud alates 3-tähelistest sõnadest.
+
+```{r sonasageduse visualiseerimine} 
+ggplot(paevalehe_sonasagedus[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "Sõnasagedus reklaamides 1920-1940")
+```
+
+### Vaatame, kas sõnastus tundub rahvuslikum vaikival ajastul võrreldes
+
+Eemaldame peamised otsisõnad, sest need ei aita märgata rahvuslikke sõnu.
+
+```{r vaikiv ajastu ja varasem aeg} 
+# 1) Sõnasagedus 1920–1934 – eemaldame tubak*, pabeross*, sigar*
+sonas_20_34 <- paevalehe_reklaamid %>%
+  filter(LogicalSectionType == "ADVERTISEMENT",
+         year >= 1920,
+         year <= 1934) %>%
+  sonasagedusefunktsioon() %>%
+  filter(!str_detect(word,
+                     regex("^(tubak.*|pabeross.*|sigar.*)$",
+                           ignore_case = TRUE)))
+
+# 2) Sõnasagedus 1934–1940 – sama puhastus
+sonas_34_40 <- paevalehe_reklaamid %>%
+  filter(LogicalSectionType == "ADVERTISEMENT",
+         year >= 1934,
+         year <= 1940) %>%
+  sonasagedusefunktsioon() %>%
+  filter(!str_detect(word,
+                     regex("^(tubak.*|pabeross.*|sigar.*)$",
+                           ignore_case = TRUE)))
+
+ggplot(sonas_20_34[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    x = "Sõna",
+    y = "Sagedus",
+    title = "Sõnasagedus reklaamides 1920–1934 (eemaldatud otsisõnad 'tubak, pabeross, sigar')"
+  )
+
+
+ggplot(sonas_34_40[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    x = "Sõna",
+    y = "Sagedus",
+    title = "Sõnasagedus reklaamides 1934–1940 (eemaldatud otsisõnad 'tubak, pabeross, sigar')"
+  )
+```
+
+Võiks öelda sõnasageduse põhjal, et andmestik on isegi rohkem välismaid mainivate sõnadega vaikival ajastul, kui varasemalt.
+
+VAJUTA PÄRAST CONCS VÕRDLUST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+```{r vaikiv ajastu ja varasem aeg TEST2 TOP2VEC} 
+################################################################################
+# 2. Tarvilikud teegid ---------------------------------------------------------
+################################################################################
+library(top2vecr)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(stringr)
+library(tibble)   
+################################################################################
+# 3. Dokumendifailide ettevalmistus -------------------------------------------
+#    top2vecr ootab data.frame'i veergudega doc_id + text                    --
+################################################################################
+docs_20_34_df <- paevalehe_reklaamid %>% 
+  filter(LogicalSectionType == "ADVERTISEMENT",
+         year >= 1920, year <= 1934) %>% 
+  group_by(id) %>% 
+  summarise(text = str_c(context, collapse = " "), .groups = "drop") %>% 
+  transmute(doc_id = as.character(id), text)
+
+docs_34_40_df <- paevalehe_reklaamid %>% 
+  filter(LogicalSectionType == "ADVERTISEMENT",
+         year >= 1934, year <= 1940) %>% 
+  group_by(id) %>% 
+  summarise(text = str_c(context, collapse = " "), .groups = "drop") %>% 
+  transmute(doc_id = as.character(id), text)
+
+################################################################################
+# 4. Mudelite treenimine top2vecr()--------------------------------------------
+#    Võid timmida nt dim, n_neighbours, minPts jne (vaata ?top2vecr)          --
+################################################################################
+model_20_34 <- top2vecr(
+  x           = docs_20_34_df,
+  dim         = 300L,            # embedding‑dimensioon
+  n_neighbours= 15L,
+  n_components= 5L,
+  minPts      = 30L
+)
+
+model_34_40 <- top2vecr(
+  x           = docs_34_40_df,
+  dim         = 300L,
+  n_neighbours= 15L,
+  n_components= 5L,
+  minPts      = 30L
+)
+
+################################################################################
+# 5. Teematopisõnade väljavõte -------------------------------------------------
+#    top2vecr tagastab listi, kus iga element = data.frame 10 parima sõnaga   --
+################################################################################
+get_top_words <- function(topic_list) {
+  map_dfr(topic_list, \(df) {
+    tibble(
+      topic = unique(df$topic),
+      words = paste(df$word, collapse = ", ")
+    )
+  })
+}
+
+t20 <- get_top_words(model_20_34)
+t34 <- get_top_words(model_34_40)
+
+topics_wide <- full_join(
+  t20 %>% rename(words_20_34 = words),
+  t34 %>% rename(words_34_40 = words),
+  by = "topic"
+) %>% arrange(topic)
+
+################################################################################
+# 6. Tulemuse tabel (knitr või print) -----------------------------------------
+################################################################################
+knitr::kable(
+  topics_wide,
+  col.names = c("Teema #", "1920–34 (top sõnad)", "1934–40 (top sõnad)"),
+  caption   = "top2vecr‑i 10 põhiteemat kahes ajavahemikus"
+)
+```
+
+
+
+### Miks oli 1923. aastal kõige enim reklaame?
+
+Vaatame 1923. aasta sõnasagedust.
+
+```{r sagedus, echo=F} 
+sonasagedus1923 <- paevalehe_reklaamid %>%
+  filter(LogicalSectionType == "ADVERTISEMENT" & year == 1923) %>% 
+  unnest_tokens(word, context) %>% ## context vs txt
+  mutate(word = str_remove_all(word, "[0-9]")) %>% 
+  filter(nchar(word) > 3) %>% 
+  filter(!word %in% c("pabeross", "tubakas", "tubak", "sigar", "suits")) %>% 
+  mutate(word=str_replace_all(word,"w","v")) %>%
+  anti_join(data.frame(word = stoppsonad), by = "word") %>% 
+  
+  count(word, sort = TRUE) %>% 
+  filter(n > 3)
+
+ggplot(sonasagedus1923[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "1923. aasta reklaamide sõnasagedus")
+
+```
+
+Sõnasageduse tabel on sarnane ning näitab peamiselt tubakatehaste reklaame, mingit eripära ei tule välja, miks neid nii palju on sel aastal.
+
+### Vaatame millised näevad välja 1923. aastal bigrammid ja kollokatsioonid
+
+```{r 1923 bigrammid} 
+#kui ei lase knittida eval=F
+reklaamid_1923 <- paevalehe_reklaamid %>% filter(LogicalSectionType == "ADVERTISEMENT" & year == 1923)
+
+bigrams_1923 <- reklaamid_1923 %>% unnest_tokens(bigram, context, token = "ngrams", n = 2)
+
+bigrams_1923
+#oluliselt paistab välja "selts" + "lõng" ning "hoidma" + "järeleteoeibis/e", muud on tubakareklaamid.
+#Järelteoeibis on "järeltegemine" ning see on "Jawa" paberossi reklaam tubakatehase A. Reier ja Ko poolt. 
+#Näide: https://dea.digar.ee/article/kaja/1923/01/05/1/3.1 
+
+library(quanteda)
+library(quanteda.textstats)
+
+corp <- corpus(reklaamid_1923, text_field = "context")
+
+toks <- tokens(corp,
+  remove_punct = TRUE,
+  remove_symbols = TRUE,
+  remove_numbers = TRUE
+) %>%
+  tokens_remove(pattern = stoppsonad) %>%
+  tokens_remove(pattern = "^[[:alpha:]]{1,3}$", valuetype = "regex")
+
+cols <- textstat_collocations( toks, size = 2, min_count = 5 )
+
+head(cols, 20)
+
+#Kõik näitajad näitavad, et 1923. aastal ~2800 reklaami olid tõesti kõik täies hoos tubakareklaame tegemas. Ette tuleb A. Reieri reklaamid, Astoria reklaamid, isegi Sultan Flor, OÜ Tubak ja siis Laferme "keemiliselt puhastama". "Eesti tubakatehas" ka kollokatsioon? Bränd Kotkas ja Kuld, mis on vist ETK?
+```
+
+
+Siit edasi testin ma erinevaid sõnesid, et leida mitte-tubakareklaame.
+
+```{r sonetestid e debug, eval=F}
+#Otsin tekste, kus esinevad näiteks sõnad "korter", "tuba" ehk kahtlased tekstid.
+#abielupaar|üür|tööd|telef|kell
+
+#korter <- paevalehe_reklaamid %>%
+  #filter(grepl("korter", context, ignore.case = TRUE)) 
+#noormees <- paevalehe_reklaamid %>%
+  #filter(grepl("noormees", context, ignore.case = TRUE)) 
+#mittesuitsetaja <- paevalehe_reklaamid %>%
+  #filter(grepl("mittesuitsetaja", context, ignore.case = TRUE))
+kell <- paevalehe_reklaamid %>%
+  filter(grepl("\\bkell\\b", context, ignore.case = TRUE))
+tuba <- paevalehe_reklaamid %>%
+  filter(grepl("\\btuba\\b", context, ignore.case = TRUE))
+#teenistus <- paevalehe_reklaamid %>%
+#  filter(grepl("teenistus", context, ignore.case = TRUE))
+
+#mottetud <- c("korter", "tuba", "köök", "üür", "tööd", "laps", "abielupaar", "müüa", "müügile")?????????
+```
+
+```{r kasitsi filtri loomine?, eval=F}
+konfisk <- paevalehe_reklaamid %>%
+  filter(grepl("sprott", context, ignore.case = TRUE))
+```
+
+Sõnasagedustest leiab "sigar" sõnaga koosesinemisi sõnaga "konfiskeerima"
+
+```{r konfisk, eval=F}
+konfisk <- sigar %>%
+  filter(grepl("konfisk", context, ignore.case = TRUE))
+```
+Konfiskeeritud kaup, 46 tulemust. Tolliinspektsiooni oksjonid.
+
+
+Uuendatud andmestik näitab, et kõik sõnad peale "kell" 607 tulemusega ning "tuba" 246 tulemusega on põhimõtteliselt olematud (alla 60 tulemuse).
+
+"Kell" mainimine leidub erinevates ja kattuvates reklaamides, mille konkordantsid on natuke kaasa võtnud. Ehk siis eelmise reklaami tekst, kus on üritus tulemas vms ja kellaaeg mainitud, tuleb natukene sisse. Näide: https://dea.digar.ee/article/postimeesew/1920/11/15/20.2 
+
+Pigem ei eemaldaks "kell" sõnaga tulemused, kuna eemaldab ka reklaame.
+
+### Siin testin spetsiifilisi tubakareklaami leida, mis on lähilugemisega silma paistnud.
+
+```{r pneumaatiline test, eval=F}
+pneumaat <- paevalehe_reklaamid %>%
+  filter(grepl("pneum", context, ignore.case = TRUE))
+```
+
+Sarnaselt "pneumaat" (199-211 vastet) annavad nikotiin, mürk mõlemad ligikaudu 50 tulemust.
+
+```{r fuzzy pneum, eval=F}
+library(dplyr)
+library(stringdist)   
+library(fuzzyjoin)    
+
+max_dist <- 1 
+
+pneum <- paevalehe_reklaamid %>%
+  filter(
+    sapply(context, function(context) {
+      length(agrep("pneum", context,
+                   max.distance = max_dist,
+                   ignore.case = TRUE)) > 0
+    })
+  )
+```
+
+Fuzzy matching annab põhimõtteliselt sama tulemuse, mis grep
+
+### Vaatame, kuidas näeb välja sõnasagedus iga erineva peaotsisõna puhul.
+
+```{r korpusesoned}
+#tubak|suits|sigar|pabeross
+suits <- paevalehe_reklaamid %>%
+  filter(grepl("(?i)suits\\w*", context, ignore.case = TRUE))
+
+tubak <- paevalehe_reklaamid %>%
+  filter(grepl("(?i)tubak\\w*", context, ignore.case = TRUE))
+
+sigar <- paevalehe_reklaamid %>%
+  filter(grepl("(?i)sigar\\w*", context, ignore.case = TRUE))
+
+pabeross <- paevalehe_reklaamid %>%
+  filter(grepl("(?i)pabeross\\w*", context, ignore.case = TRUE))
+
+```
+
+
+Visualiseerin sagedused
+
+```{r sonasageduse visualiseerimine 2}
+#4 eraldi sagedustabelit
+sagedus_suits <- sonasagedusefunktsioon(suits)
+sagedus_tubak <- sonasagedusefunktsioon(tubak)
+sagedus_sigar <- sonasagedusefunktsioon(sigar)
+sagedus_pabeross <- sonasagedusefunktsioon(pabeross)
+
+ggplot(sagedus_suits[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "darkgreen") +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "„Suits“ sisaldavate reklaamide sõnasagedus")
+
+ggplot(sagedus_tubak[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "darkgreen") +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "„Tubak“ sisaldavate reklaamide sõnasagedus")
+
+ggplot(sagedus_sigar[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "darkgreen") +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "„Sigar“ sisaldavate reklaamide sõnasagedus")
+
+ggplot(sagedus_pabeross[1:40, ], aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "darkgreen") +
+  coord_flip() +
+  labs(x = "Sõna", y = "Sagedus", title = "„Pabeross“ sisaldavate reklaamide sõnasagedus")
+```
+
+
+### Vaatame sigarettide ja paberosside populaarsust
+
+```{r sigar vs pabeross, include=F}
+sigar <- sigar %>% mutate(type = "Sigar")
+pabeross <- pabeross %>% mutate(type = "Pabeross")
+
+koos <- bind_rows(sigar, pabeross)
+
+aastad_summary <- koos %>%
+  filter(LogicalSectionType == "ADVERTISEMENT") %>%
+  group_by(year, type) %>%
+  summarise(count = n_distinct(id), .groups = "drop") 
+
+ggplot(aastad_summary, aes(x = year, y = count, color = type)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  labs(title = "Sigar vs Pabeross reklaamide esinemine aastate lõikes",
+       x = "Aasta", y = "Reklaamide arv", color = "Sõna") +
+  theme_minimal()
+```
+
+Ei ole võrreldav/mõõdetav, kuna sigar* reklaame liiga vähe. Sõna "sigaret*" annab ca 800 tulemust 20 aasta perioodil.
+
+
+### "Suits" bigrammid
+
+```{r bigrammid, ei lase knittida, eval=F}
+bigrams <- suits %>%
+  unnest_tokens(bigram, context, token = "ngrams", n = 2) %>%
+  filter(str_detect(bigram, regex("suits\\w*", ignore_case = TRUE)))
+
+bigrams
+```
+
+Kollokatsioonide test
+
+```{r collocations}
+library(quanteda)
+library(quanteda.textstats)
+
+corp <- corpus(paevalehe_reklaamid, text_field = "context")
+#pane sinna mittesuitsetaja corpus(mittesu....), sama pabeross suotis sigar jne
+
+stoppsonad <- readLines("https://datadoi.ee/bitstream/handle/33/78/estonian-stopwords-lemmas.txt?sequence=1&isAllowed=y")
+
+toks <- tokens(
+  corp,
+  remove_punct = TRUE,
+  remove_symbols = TRUE,
+  remove_numbers = TRUE
+)
+
+toks <- tokens_remove(toks, pattern = "^[[:alpha:]]{1,3}$", valuetype = "regex")
+
+toks <- tokens_remove(toks, pattern = stoppsonad)
+
+cols <- textstat_collocations(
+  toks,
+  size = 2,
+  min_count = 5
+)
+
+head(cols, 20)
+
+```
+
+
+```{r lahilugemine, eval=F}
+df_mai_1932 <- subset(
+  paevalehe_reklaamid,
+  substr(as.character(dateraw), 1, 6) == "193205"
+)
+
+df_august_1927 <- subset(
+  paevalehe_reklaamid,
+  substr(as.character(dateraw), 1, 6) == "192708"
+)
+
+df_veebruar_1935 <- subset(
+  paevalehe_reklaamid,
+  substr(as.character(dateraw), 1, 6) == "193502"
+)
+
+df_november_1925 <- subset(
+  paevalehe_reklaamid,
+  substr(as.character(dateraw), 1, 6) == "192511"
+)
+```
+
+
+--------------------------------------------------------------------------------
+
+Nüüd tuleb firmadepõhine analüüs, kus kasutame tubakakorpust.
+
+
+```{r firmad}
+firmad <- c("Laferme", "Sirena", "Katlama", "Regina", "Havanna", "Sultan Flor", "Reier", "Astoria", "H. Anton", "Kungla", "Steinberg", "Leo Scheer", "Osman", "\\bETK\\b")
+
+top7firmat <- c("Laferme", "Sirena", "Regina", "Havanna", "Astoria", "H. Anton", "ETK")
+#Tegelt peaks analüüsima vaid Laferme, mille alla lisandub Havanna.
+#Astoria, mis on hiljem Regina ja H. Anton
+#Sirena oli OÜ "Tubak", seda raske filterdada vb "o-ü tubak"
+#ETK
+```
+
+```{r hetkel teadaolevad brandid, eval=F}
+#Ei ole vajalik, kuna kaubamärke oli mustmiljon selle 20 aasta perioodi vältel.
+
+brands <- c("Baar", "Stella", "Diva", "Niilus", "Manon", "Orient", "Lia", "Malta", "Ekstra", "Kasulik", "Special")
+
+paevalehe_reklaamid$brand <- str_extract(paevalehe_reklaamid$context, str_c(brands, collapse = "|"))
+
+brand_counts <- paevalehe_reklaamid %>%
+  count(brand, sort = TRUE)
+
+brand_counts <- brand_counts[!is.na(brand_counts$brand), ]
+
+ggplot(brand_counts, aes(x = reorder(brand, n), y = n)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black") +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Brändisagedus", x = "Bränd", y = "Sagedus")
+```
+
+```{r firmatabelite suur loop}
+
+firmadelist_reklaamidega <- list()
+
+#loop, mis asendab kõik vigased "ja"d ja 
+for (ettevote in firmad) {
+  ettevote <- gsub("\\[ja&\\]", "ja|&", ettevote)  
+  ettevote <- gsub("\\[AE\\]", "A|E", ettevote) 
+  
+  #H. Anton ja ETK parandused
+  if (ettevote == "H. Anton") {
+    search_pattern <- "H\\.\\s*Anton"
+  } else if (ettevote == "\\bETK\\b") {
+    search_pattern <- "\\bETK\\b"
+  } else {
+    search_pattern <- ettevote
+  }
+
+  #otsib firmanimesid paevalehe reklaamidest
+  firmadelist_reklaamidega[[ettevote]] <- paevalehe_reklaamid[grepl(search_pattern, paevalehe_reklaamid$context, ignore.case = TRUE, perl = TRUE), ]
+}
+
+#tabel, mis näitab kui palju on leitud ridu mis ettevõttel
+firmamainimine_reklaamidega <- data.frame(Ettevote = character(), LeitudRidadeArv = numeric())
+
+#loeb mainimisi
+for (ettevote in names(firmadelist_reklaamidega)) {
+  if (nrow(firmadelist_reklaamidega[[ettevote]]) > 0) {
+    firmamainimine_reklaamidega <- rbind(firmamainimine_reklaamidega, 
+                                     data.frame(Ettevote = ettevote, 
+                                                LeitudRidadeArv = nrow(firmadelist_reklaamidega[[ettevote]])))
+  }
+}
+
+#kui 0 mainimist, siis viskan välja data framest
+firmamainimine_reklaamidega <- firmamainimine_reklaamidega %>% 
+  filter(LeitudRidadeArv != 0) %>%
+  arrange(desc(LeitudRidadeArv))
+
+#ggplot
+ggplot(firmamainimine_reklaamidega, aes(y = reorder(Ettevote, LeitudRidadeArv), x = LeitudRidadeArv)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  scale_y_discrete(labels = c("Reier" = "A. Reier ja Ko", "H. Anton" = "H. Anton ja Ko", "Steinberg" = "E. Steinberg ja Ko")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0)) +
+  labs(x = "Mainimiste arv", y = "Ettevõte", title = "Ettevõtete mainimiste arv reklaamides")
+
+
+for (nimi in top7firmat) {
+  if (nimi == "H. Anton") {
+    search_pattern <- "H\\.\\s*Anton"
+  } else if (nimi == "ETK") {
+    search_pattern <- "\\bETK\\b"
+  } else {
+    search_pattern <- nimi
+  }
+  
+  #vana paragraafidega loop
+  paevalehe_reklaamid[[nimi]] <- paevalehe_reklaamid$context %>%
+    gsub("<p>", "@@@@<p>", .) %>%
+    gsub("<\\/p>", "</p>@@@@", .) %>%
+    str_split(., "@@@@") %>%
+    lapply(., function(x) x %>%
+             grep(search_pattern, ., ignore.case = TRUE, value = TRUE) %>%
+             paste(., collapse = " ")) %>%
+    unlist()
+  
+  #võtab mainimiste hulga vastavalt aastale
+  assign(paste0(nimi, "_mainimiste_arv"), paevalehe_reklaamid %>%
+           group_by(year) %>%
+           summarise(mainimiste_arv = sum(nchar(get(nimi)) > 0)))
+  
+  #paneb mainimiste hulga plotile
+  plot <- ggplot(get(paste0(nimi, "_mainimiste_arv")), aes(x = year, y = mainimiste_arv)) +
+    geom_point() +
+    geom_line() +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    theme_minimal() +
+    labs(x = "Aasta", y = "Mainimiste arv", 
+         title = paste0(nimi, " reklaamide hulk aastatel"))
+  
+  print(plot)
+  
+  #joon
+  fir.m <- lm(mainimiste_arv ~ year, data = get(paste0(nimi, "_mainimiste_arv")))
+  print(summary(fir.m))
+}
+
+kogu_mainimiste_arv <- bind_rows(lapply(top7firmat, function(nimi) 
+  get(paste0(nimi, "_mainimiste_arv")) %>% mutate(firma = nimi)))
+
+ggplot(data = kogu_mainimiste_arv) +
+  geom_line(aes(x = year, y = mainimiste_arv, group = firma, color = firma), size = 1.2) +
+  scale_x_continuous(breaks = seq(min(kogu_mainimiste_arv$year), max(kogu_mainimiste_arv$year), by = 2)) +
+  theme_light() +
+  labs(x = "Aasta",
+       y = "Mainimiste arv",
+       title = "Firmade mainimiste arv aastate lõikes",
+       color = "Ettevõte")
+
+#sonasageduse loop
+firmade_sonasagedus <- list()
+
+for (nimi in top7firmat) {
+  if (nimi == "H. Anton") {
+    search_pattern <- "H\\.\\s*Anton"
+  } else if (nimi == "ETK") {
+    search_pattern <- "\\bETK\\b"
+  } else {
+    search_pattern <- nimi
+  }
+  
+  firma_reklaamid <- paevalehe_reklaamid %>%
+    filter(grepl(search_pattern, context, ignore.case = TRUE)) 
+  
+  firma_sonasagedus <- firma_reklaamid %>%
+    unnest_tokens(token, context) %>% 
+    mutate(token = str_remove_all(token, "[0-9]")) %>% 
+    filter(nchar(token) > 3) %>%
+    count(token, sort = TRUE)
+  
+  #sonasagedus salvestub tabelisse vastavalt firmanimele
+  firmade_sonasagedus[[nimi]] <- firma_sonasagedus
+}
+
+#vastavalt firmanimele for loop et printida sõnasageduse
+for (vabrik in top7firmat) {
+  vabriku_sonasagedus <- firmade_sonasagedus[[vabrik]]
+  
+  plot <- ggplot(vabriku_sonasagedus[1:20, ], aes(x = reorder(token, n), y = n)) +
+    geom_col(fill = "darkgreen") +
+    coord_flip() +
+    theme_minimal() +
+    labs(x = "Sõna", y = "Sagedus", title = paste("Sõnasagedus reklaamides ('", vabrik, "')", sep = ""))
+
+  print(plot)
+}
+
+```
+
+
+Kõik teadaolevad tubakaettevõtted 1920.-1930. aastatel:
+AS „Laferme“ ,
+OÜ „Tubak“, 
+AS „Regina“, 
+OÜ „Havanna“, 
+„Sultan Flor“, 
+AS „A. Reier & Ko“, 
+AS „Astoria“ ning 
+„H. Anton ja Ko“, 
+Tubakavabrik „Ka De We“, 
+Eesti Tarvitajateühisuste Keskühisus (ETK), 
+AS „Sirena“ ning „B. Katlama“
+
+Väiksemad ettevõtted:
+
+Tubakavabrik „Eslon“
+Tubakavabrik „Kungla“, omanikuks August Ney
+Paberossitehas „Aino“ omanik Lugenberg & Ko
+Tubakatehas E. Steinberg & Ko
+Tubakavabrik AS "Leo Scheer"
+Tallinna sigaritehas Kubana, rajas N. Leinbok
+Johannes Jostoville paberossitehas
+Jaan Kanguri tubakavabrik
+Seeberg ja Kirsch paberossitehas
+Emiil Silbergi tubaka-ja paberossitehas „Siiwa“ 

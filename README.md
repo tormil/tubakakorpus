@@ -39,7 +39,7 @@ $ cd tubakareklaamid‑1920‑40
 | Fail | Fookus/teema |
 |-------------------------|----------------------------------------------|
 | **Tubakaandmestik_loputoo.ipynb** | Korpuse koostamise retsept: päring DIGAR‑ist, puhastus‑/filtriloogika ja analüüs. |
-| **branch_ilmasuitsutaTubakaandmestik_loputoo-Copy1.ipynb** | Paralleelharu korpuse versioonist, kust suitsuvabad tooted on *a priori* eemaldatud; võimaldab kontrollida, kuidas see mõjutab trendijooni. |
+| **branch_ilmasuitsutaTubakaandmestik_loputoo-Copy1.ipynb** | Paralleelharu korpuse versioonist, kust regulaaravaldis "suits" eemaldatud; võimaldab kontrollida, kuidas see mõjutab trendijooni. |
 
 ------------------------------------------------------------------------
 

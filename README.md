@@ -16,7 +16,7 @@ $ cd tubakareklaamid‑1920‑40
 # või ava Jupyter Notebookid, kui eelistad Python/R hübriidi
 ```
 
-> **Eeldused**: R ≥ 4.3, Jupyter Lab (Python 3.11 + `IRkernel`), ning R‑paketid `digar.txts`(mida saab ainult läbi JupyterLab'i/RaRa digilabori), `tidyverse`, `tidytext`, `top2vec`, `stringdist`, `data.table` jpm.
+> **Eeldused**: R ≥ 4.3, Jupyter Lab (Python 3.11 + `IRkernel`), ning R‑paketid `digar.txts`(mida saab ainult läbi JupyterLab'i/RaRa digilabori), `tidyverse`, `tidytext`, `top2vec`, `stringdist`, `data.table` jpt.
 
 ------------------------------------------------------------------------
 
@@ -82,4 +82,4 @@ Kui avastad vigu või sul on ettepanekuid – tee **Pull Request** või ava **Is
 
 ------------------------------------------------------------------------
 
-> *Viimati uuendatud: 17. mai 2025.*
+> *Viimati uuendatud: 18. mai 2025.*

@@ -28,9 +28,9 @@ $ cd tubakareklaamid‑1920‑40
 |-----------------------|-------------------------------------------------|
 | **tubakakorpus.Rmd** | PEAMINE "MASTER", kuhu koondub puhastatud andmestik ja lõplik graafikute genereerimine ning ka osaliselt korpuse koostamise retsept: päring DIGAR‑ist, puhastus‑/filtriloogika ja analüüs. |
 | Fail | Harud/iteratsioonid, mis olen alles jätnud |
-| **branch_bakat66top2vecrtest+stopptykid.Rmd** | Top2Vec‑i testid ja stoppsõnadeta katse korpusega. Uurib semantilisi klastreid ja visualiseerib reklaamide teemapilve. |
-| **branch_bakat66 fuzzy matching trial.Rmd** | „Fuzzy” tekstilise vastavuse katse, et siduda reklaame ettevõtte‑ID‑dega, kasutades `stringdist`‑i ja Jaro‑Winkleri meetodit. |
-| **branch_bakat66_konkordants_pohjendus.Rmd** | Põhjendus ja logi konkordantsipõhise lähenemise valikust: kuidas lehekülg‐ja‐kontekst‑ekstrakt aitab artikleid reklaamidena tuvastada. |
+| **branch_bakat66top2vecrtest+stopptykid.Rmd** | Top2Vec‑i testid ja käsitsi puhastamise (stopptykid) katse korpusega. |
+| **branch_bakat66 fuzzy matching trial.Rmd** | „Fuzzy” tekstilise vastavuse katse, et siduda reklaame ettevõtte‑ID‑dega. Varasemad katsed olid ka fuzzy matching põhimõttel tehtud, aga lihtsalt käsitsi proovitud erinevaid regex metamärke. |
+| **branch_bakat66_konkordants_pohjendus.Rmd** | Põhjendus konkordantsipõhise lähenemise valikust: kuidas lehekülg‐ja‐kontekst‑ekstrakt aitab artikleid reklaamidena tuvastada. Siia kuulub ka Joonis 3. Reklaamisegmendi teksti pikkused tähemärkide numbrite arvuna. |
 | **branch_bakat66_suitsu_pohjendus.Rmd** | Analüüs, miks „suitsuvabad“ tooted (nt närimistubakas) esimeses faasis kõrvale jäeti; võrdlused reklaamimustritega. |
 | **branch_vana_ettevotte_analyys_bakat66.Rmd** | Varane/"vana" katse ettevõtete tasemel trendide leidmiseks; hoitud alles reproducibility huvides. |
 

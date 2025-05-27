@@ -22,6 +22,8 @@ $ cd tubakareklaamid‑1920‑40
 
 ## 2. Failide ja teemade ülevaade
 
+Peamine ülevaade tulemustest on 
+
 ### 2.1 RMarkdowni tööharud ("branch\_…\*.Rmd")
 
 | Fail | Fookus/teema |
@@ -58,7 +60,7 @@ $ cd tubakareklaamid‑1920‑40
 ## 4. Andmeallikad ja litsentsid
 
 -   **DEA DIGARi ajalehe‑korpus** (Eesti Rahvusraamatukogu digilabor). https://digilab.rara.ee/tooriistad/ligipaas-dea-tekstidele/ Kasutustingimused võimaldavad teadus‑ ja õppetööd; kaubanduslik kasutus vajab eraldi luba.
--   Kood on litsentseeritud ?????????
+-   Kood on litsentseeritud MIT litsentsiga.
 
 ------------------------------------------------------------------------
 

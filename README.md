@@ -1,7 +1,7 @@
 # Tubakakorpus
 # Tubakareklaamide analüüsi tööprojekt
 
-See repositoorium koondab minu bakalaureusetöö **„Eesti tubakareklaamid ajalehtedes 1920–1940“** käigus koostatud skriptid, andmetöötluse etapid ja vaheanalüüsid. Failid on siia kogunenud erinevatest tööharudest (branch‑idest) ning igaühel on oma fookus. Allpool on juhend, et leiaksid kiiresti üles, **kus miski asub ja mida see teeb**.
+See repositoorium koondab minu bakalaureusetöö **„Eesti tubakareklaamid ajalehtedes 1920–1940“** käigus koostatud skriptid, andmetöötluse etapid ja vaheanalüüsid. Failid on siia kogunenud erinevatest tööharudest (branch‑idest) ning igaühel on oma fookus. Peamine ülevaade tulemustest ilma koodi jooksutama on "tubakakorpus.html". Allpool on juhend, et leiaksid kiiresti üles, **kus miski asub ja mida see teeb**.
 
 ------------------------------------------------------------------------
 
@@ -22,7 +22,7 @@ $ cd tubakareklaamid‑1920‑40
 
 ## 2. Failide ja teemade ülevaade
 
-Peamine ülevaade tulemustest on 
+### Peamine fail "tubakakorpus.html" pakub põhjalikku ülevaadet tulemustest ilma koodi käivitamata.
 
 ### 2.1 RMarkdowni tööharud ("branch\_…\*.Rmd")
 
@@ -84,4 +84,4 @@ Kui avastad vigu või sul on ettepanekuid – tee **Pull Request** või ava **Is
 
 ------------------------------------------------------------------------
 
-> *Viimati uuendatud: 18. mai 2025.*
+> *Viimati uuendatud: 27. mai 2025.*

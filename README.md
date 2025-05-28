@@ -28,7 +28,7 @@ $ cd tubakareklaamid‑1920‑40
 
 | Fail | Fookus/teema |
 |-----------------------|-------------------------------------------------|
-| **tubakakorpus.Rmd** | PEAMINE "MASTER", kuhu koondub puhastatud andmestik ja lõplik graafikute genereerimine ning ka osaliselt korpuse koostamise retsept: päring DIGAR‑ist, puhastus‑/filtriloogika ja analüüs. |
+| **tubakakorpus.Rmd** | PEAMINE "MASTER", kuhu kuulub peamiselt analüüsiosa ja lõplik graafikute genereerimine: sõnasagedused, kollokatsioonid, bigrammid. |
 | Fail | Harud/iteratsioonid, mis olen alles jätnud |
 | **branch_bakat66top2vecrtest+stopptykid.Rmd** | Top2Vec‑i testid ja käsitsi puhastamise (stopptykid) katse korpusega. |
 | **branch_bakat66 fuzzy matching trial.Rmd** | „Fuzzy” tekstilise vastavuse katse, et siduda reklaame ettevõtte‑ID‑dega. Varasemad katsed olid ka fuzzy matching põhimõttel tehtud, aga lihtsalt käsitsi proovitud erinevaid regex metamärke. |
@@ -40,7 +40,7 @@ $ cd tubakareklaamid‑1920‑40
 
 | Fail | Fookus/teema |
 |-------------------------|----------------------------------------------|
-| **Tubakaandmestik_loputoo.ipynb** | Korpuse koostamise retsept: päring DIGAR‑ist, puhastus‑/filtriloogika ja analüüs. |
+| **Tubakaandmestik_loputoo.ipynb** | Digilabi tööriistadega ja DIGARi andmetega tutvumine (päring DIGARist), algandmestiku loomine ning korpuse koostamise retsept: märksõnaotsing, piiritlemine ja filtreerimine, konkordantsid. |
 | **branch_ilmasuitsutaTubakaandmestik_loputoo-Copy1.ipynb** | Paralleelharu korpuse versioonist, kust regulaaravaldis "suits" eemaldatud; võimaldab kontrollida, kuidas see mõjutab trendijooni. |
 
 ------------------------------------------------------------------------
